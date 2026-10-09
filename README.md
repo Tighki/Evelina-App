@@ -14,6 +14,16 @@ python main.py
 
 То же самое: `python -m evelina`.
 
+Готовая программа без исходников собирается так:
+
+```bash
+python -m venv --system-site-packages .venv
+.venv/bin/pip install pyinstaller
+.venv/bin/pyinstaller --noconfirm evelina.spec
+```
+
+Файл запуска: `dist/evelina/evelina`. Это программа для Linux. Рядом с ней, в `dist/evelina/data/`, лежит её база. Файл `.exe` для Windows эта сборка не делает: окно завязано на GTK этой системы.
+
 При первом запуске создаётся `data/support.db` и наполняется тестовыми учётными записями и обращениями. Повторный запуск эти строки не дублирует.
 
 ## Вход
@@ -50,7 +60,8 @@ python main.py
 ## Структура
 
 ```
-main.py                 запуск
+main.py                 запуск из исходников
+evelina.spec            сборка программы
 evelina/
   __init__.py
   __main__.py           python -m evelina

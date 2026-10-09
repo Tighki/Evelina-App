@@ -6,11 +6,18 @@
 import hashlib
 import os
 import sqlite3
+import sys
 from datetime import datetime
 
 
+def _app_dir():
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
 def _resolve_db_path():
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    root = _app_dir()
     data_dir = os.path.join(root, "data")
     os.makedirs(data_dir, exist_ok=True)
     path = os.path.join(data_dir, "support.db")
