@@ -20,7 +20,21 @@ runtime_hooks = []
 hooksconfig = {}
 
 if sys.platform == "win32":
-    prefix = Path(os.environ.get("UCRT64_PREFIX", r"C:\msys64\ucrt64"))
+    _prefix_candidates = [
+        os.environ.get("UCRT64_PREFIX"),
+        os.environ.get("MSYSTEM_PREFIX"),
+        r"C:\msys64\ucrt64",
+    ]
+    prefix = None
+    for raw in _prefix_candidates:
+        if not raw:
+            continue
+        candidate = Path(raw)
+        if (candidate / "lib" / "girepository-1.0").is_dir():
+            prefix = candidate
+            break
+    if prefix is None:
+        prefix = Path(r"C:\msys64\ucrt64")
     binaries += [(str(path), ".") for path in (prefix / "bin").glob("*.dll")]
     datas += [
         (str(prefix / "lib" / "girepository-1.0"), os.path.join("lib", "girepository-1.0")),
