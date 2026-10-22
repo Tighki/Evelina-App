@@ -1,6 +1,5 @@
 __pycache__/
 *.py[cod]
-data/*.db
 .venv/
 build/
 dist/

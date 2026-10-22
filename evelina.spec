@@ -8,8 +8,10 @@ a = Analysis(
     hiddenimports=[
         "evelina",
         "evelina.db",
+        "evelina.mariadb_conn",
         "evelina.distribution",
         "evelina.ui",
+        "pymysql",
     ],
     hookspath=[],
     hooksconfig={},

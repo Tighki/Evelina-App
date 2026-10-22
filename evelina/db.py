@@ -1,33 +1,14 @@
-"""SQLite: users (одна таблица, роль в поле role), tickets, comments, history.
+"""MariaDB: users (одна таблица, роль в поле role), tickets, comments, history.
 
 Логин уникален. Повторно не создаётся открытое обращение с той же темой у того же автора.
+Переменные: DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME (по умолчанию evelina).
 """
 
 import hashlib
 import os
-import sqlite3
-import sys
 from datetime import datetime
 
-
-def _app_dir():
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(os.path.abspath(sys.executable))
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-
-def _resolve_db_path():
-    root = _app_dir()
-    data_dir = os.path.join(root, "data")
-    os.makedirs(data_dir, exist_ok=True)
-    path = os.path.join(data_dir, "support.db")
-    legacy = os.path.join(root, "support.db")
-    if not os.path.exists(path) and os.path.exists(legacy):
-        os.replace(legacy, path)
-    return path
-
-
-DB_PATH = _resolve_db_path()
+from evelina.mariadb_conn import IntegrityError, connect
 
 ROLES = ("admin", "operator", "user")
 CATEGORIES = ("hardware", "software", "network", "access", "other")
@@ -40,13 +21,6 @@ STATUS_RU = {
     "resolved": "Решено",
     "closed": "Закрыто",
 }
-
-
-def connect():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
 
 
 def hash_password(password, salt=None):
@@ -69,60 +43,58 @@ def init_db():
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                login       TEXT NOT NULL UNIQUE,
-                password    TEXT NOT NULL,
-                full_name   TEXT NOT NULL,
-                role        TEXT NOT NULL DEFAULT 'user'
-                                CHECK (role IN ('admin', 'operator', 'user')),
-                specialty   TEXT NOT NULL DEFAULT 'other',
-                is_active   INTEGER NOT NULL DEFAULT 1,
-                created_at  TEXT NOT NULL
+                id          INT AUTO_INCREMENT PRIMARY KEY,
+                login       VARCHAR(64) NOT NULL UNIQUE,
+                password    VARCHAR(255) NOT NULL,
+                full_name   VARCHAR(120) NOT NULL,
+                role        VARCHAR(16) NOT NULL DEFAULT 'user',
+                specialty   VARCHAR(32) NOT NULL DEFAULT 'other',
+                is_active   TINYINT NOT NULL DEFAULT 1,
+                created_at  VARCHAR(19) NOT NULL
             )
             """
         )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS tickets (
-                id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                title        TEXT NOT NULL,
-                description  TEXT NOT NULL DEFAULT '',
-                category     TEXT NOT NULL DEFAULT 'other',
-                priority     TEXT NOT NULL DEFAULT 'normal',
-                status       TEXT NOT NULL DEFAULT 'new',
-                author_id    INTEGER NOT NULL REFERENCES users(id),
-                operator_id  INTEGER REFERENCES users(id),
-                created_at   TEXT NOT NULL,
-                resolved_at  TEXT
+                id           INT AUTO_INCREMENT PRIMARY KEY,
+                title        VARCHAR(200) NOT NULL,
+                description  TEXT NOT NULL,
+                category     VARCHAR(32) NOT NULL DEFAULT 'other',
+                priority     VARCHAR(16) NOT NULL DEFAULT 'normal',
+                status       VARCHAR(16) NOT NULL DEFAULT 'new',
+                author_id    INT NOT NULL,
+                operator_id  INT NULL,
+                created_at   VARCHAR(19) NOT NULL,
+                resolved_at  VARCHAR(19) NULL,
+                FOREIGN KEY (author_id) REFERENCES users(id),
+                FOREIGN KEY (operator_id) REFERENCES users(id)
             )
             """
         )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS history (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticket_id  INTEGER NOT NULL REFERENCES tickets(id),
-                user_id    INTEGER,
-                action     TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                id         INT AUTO_INCREMENT PRIMARY KEY,
+                ticket_id  INT NOT NULL,
+                user_id    INT NULL,
+                action     VARCHAR(500) NOT NULL,
+                created_at VARCHAR(19) NOT NULL,
+                FOREIGN KEY (ticket_id) REFERENCES tickets(id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
             """
         )
         conn.execute(
             """
-            CREATE UNIQUE INDEX IF NOT EXISTS ux_open_ticket
-            ON tickets(author_id, title)
-            WHERE status IN ('new', 'in_progress')
-            """
-        )
-        conn.execute(
-            """
             CREATE TABLE IF NOT EXISTS comments (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticket_id  INTEGER NOT NULL REFERENCES tickets(id),
-                user_id    INTEGER NOT NULL REFERENCES users(id),
+                id         INT AUTO_INCREMENT PRIMARY KEY,
+                ticket_id  INT NOT NULL,
+                user_id    INT NOT NULL,
                 body       TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at VARCHAR(19) NOT NULL,
+                FOREIGN KEY (ticket_id) REFERENCES tickets(id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
             """
         )
@@ -243,7 +215,7 @@ def create_user(login, password, full_name, role="user", specialty="other", is_a
                 (login, hash_password(password), full_name, role, specialty, int(is_active), now()),
             )
         return True, "Пользователь создан"
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         return False, "Логин уже занят"
     finally:
         conn.close()
@@ -379,7 +351,7 @@ def create_ticket(title, description, category, priority, author_id):
             ticket_id = cur.lastrowid
             _log(conn, ticket_id, author_id, "Обращение создано")
         return ticket_id, None
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         return None, "Такое обращение уже открыто"
     finally:
         conn.close()
@@ -550,7 +522,7 @@ def assign_ticket(ticket_id, operator_id, actor_id=None, note=""):
                 action += f" ({note})"
             _log(conn, ticket_id, actor_id, action)
         return True, "Назначено"
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         return False, "Нельзя открыть: уже есть такое обращение"
     finally:
         conn.close()
@@ -581,7 +553,7 @@ def set_status(ticket_id, status, actor_id=None):
             )
             _log(conn, ticket_id, actor_id, f"Статус: {STATUS_RU[status]}")
         return True, "Статус обновлён"
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         return False, "Уже есть открытое обращение с такой темой"
     finally:
         conn.close()

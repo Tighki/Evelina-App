@@ -1,14 +1,17 @@
 # Служба технической поддержки
 
-Настольное приложение для приёма обращений и автоматического назначения оператора. Это не сайт: окно программы на GTK 4 и libadwaita, данные лежат в SQLite.
+Настольное приложение для приёма обращений и автоматического назначения оператора. Это не сайт: окно программы на GTK 4 и libadwaita, данные в MariaDB.
 
 ## Запуск
 
-Нужны Python 3, GTK 4 и libadwaita. На Omarchy они уже стоят, отдельные пакеты ставить не нужно.
+Нужны Python 3, GTK 4, libadwaita и PyMySQL. На Omarchy GTK уже стоят.
 
 Из корня проекта:
 
 ```bash
+python3 -m venv --system-site-packages .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 python main.py
 ```
 
@@ -22,9 +25,25 @@ python -m venv --system-site-packages .venv
 .venv/bin/pyinstaller --noconfirm evelina.spec
 ```
 
-Файл запуска: `dist/evelina/evelina`. Это программа для Linux. Рядом с ней, в `dist/evelina/data/`, лежит её база. Файл `.exe` для Windows эта сборка не делает: окно завязано на GTK этой системы.
+Файл запуска: `dist/evelina/evelina`. Это программа для Linux. Файл `.exe` для Windows эта сборка не делает: окно завязано на GTK этой системы.
 
-При первом запуске создаётся `data/support.db` и наполняется тестовыми учётными записями и обращениями. Повторный запуск эти строки не дублирует.
+При первом запуске в MariaDB создаются таблицы и демо-данные (если база пустая). Повторный запуск эти строки не дублирует.
+
+Подключение задаётся переменными окружения: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` (по умолчанию база `evelina`).
+
+Если с ПК ошибка `Can't connect ... timed out` на `178.248.7.5`, порт **3406** с интернета закрыт — поднимите SSH-туннель из корня репозитория `Practica Devok4ki`:
+
+```bash
+chmod +x mariadb-tunnel.sh
+./mariadb-tunnel.sh
+```
+
+Во втором терминале:
+
+```bash
+export DB_HOST=127.0.0.1 DB_PORT=3406
+cd Evelina-App && source .venv/bin/activate && python main.py
+```
 
 ## Вход
 
@@ -65,16 +84,15 @@ evelina.spec            сборка программы
 evelina/
   __init__.py
   __main__.py           python -m evelina
-  db.py                 SQLite: пользователи, обращения, комментарии, журнал
+  db.py                 MariaDB: пользователи, обращения, комментарии, журнал
+  mariadb_conn.py       подключение к серверу
   distribution.py       выбор оператора
   ui.py                 окно, вход и панели ролей
-data/
-  support.db            база, создаётся при запуске
 ```
 
 ## База
 
-Файл `data/support.db`.
+Сервер MariaDB, схема в базе `evelina` (или значение `DB_NAME`).
 
 - `users` — одна таблица учётных записей. Роль хранится в поле `role`: `admin`, `operator`, `user`. Логин уникален.
 - `tickets` — обращения. Автор и оператор ссылаются на `users`.
