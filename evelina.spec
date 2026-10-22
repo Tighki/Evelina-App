@@ -64,6 +64,15 @@ if sys.platform == "win32":
         },
     }
     runtime_hooks.append("evelina/windows_runtime.py")
+    from PyInstaller.utils.hooks import collect_all, collect_submodules
+
+    for _pkg in ("gi", "cairo"):
+        _d, _b, _h = collect_all(_pkg)
+        datas += _d
+        binaries += _b
+        hiddenimports += _h
+    hiddenimports += collect_submodules("gi")
+    hiddenimports += ["gi._gi", "gi._gi_cairo", "gi._gi_importer"]
 else:
     hiddenimports += [
         "gi",

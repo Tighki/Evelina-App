@@ -19,6 +19,8 @@ jobs:
             mingw-w64-ucrt-x86_64-gtk4
             mingw-w64-ucrt-x86_64-libadwaita
             mingw-w64-ucrt-x86_64-gobject-introspection
+            mingw-w64-ucrt-x86_64-python-gobject
+            mingw-w64-ucrt-x86_64-python-cairo
             mingw-w64-ucrt-x86_64-cairo
             mingw-w64-ucrt-x86_64-pango
             mingw-w64-ucrt-x86_64-gdk-pixbuf2
@@ -32,6 +34,7 @@ jobs:
       - name: PyInstaller
         shell: msys2 {0}
         run: |
+          python -c "import gi; gi.require_version('Gtk','4.0'); from gi.repository import Gtk; print('gi', gi.__file__)"
           python -m pip install -U pip
           python -m pip install -r requirements.txt pyinstaller
           python -m PyInstaller --noconfirm evelina.spec
